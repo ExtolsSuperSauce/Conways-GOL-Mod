@@ -72,7 +72,7 @@ function OnWorldPostUpdate()
 	y = math.floor(y)
 	if world_ffi.chunk_loaded(chunk_map,x,y) then
 		if EntityGetName(item_id) == "CONWAY_STONE" then
-			if ml_down then
+			if ml_down and should_simulate == 0 then
 				local pos_ptr = world_ffi.get_cell(chunk_map, x, y)
 				if pos_ptr[0] == nil then
 					local mat_ptr = world_ffi.get_material_ptr(CellFactory_GetType("conway_life_mat"))
@@ -81,6 +81,7 @@ function OnWorldPostUpdate()
 					local place_pos = { pos_x = x, pos_y = y }
 					table.insert( table_of_positions, place_pos )
 					table_insert_9x9( x, y )
+					GamePrint("Placed")
 				end
 			elseif mr_down then
 				local pos_ptr = world_ffi.get_cell(chunk_map, x, y)
