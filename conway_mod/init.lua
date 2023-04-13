@@ -127,11 +127,15 @@ function OnWorldPostUpdate()
 	end
 	
 	for i, result_cell in ipairs(table_of_results) do
+		--GamePrint(result_cell[1] .. ", " .. result_cell[2])
 		if result_cell[3] > 4 then
 			local pos_ptr = world_ffi.get_cell(chunk_map, result_cell[1], result_cell[2])
 			if pos_ptr[0] ~= nil then
-				local pixel = world_ffi.remove_cell(grid_world, pos_ptr[0], result_cell[1], result_cell[2], false)
-				pos_ptr[0] = pixel
+				local mat_id = CellFactory_GetName(world_ffi.get_material_id(pos_ptr[0].vtable.get_material(pos_ptr[0])))
+				if mat_id == "conway_life_mat" then
+					local pixel = world_ffi.remove_cell(grid_world, pos_ptr[0], result_cell[1], result_cell[2], true)
+					pos_ptr[0] = pixel
+				end
 			end
 		elseif result_cell[3] >= 3 then
 			local pos_ptr = world_ffi.get_cell(chunk_map, result_cell[1], result_cell[2])
@@ -146,8 +150,11 @@ function OnWorldPostUpdate()
 		else
 			local pos_ptr = world_ffi.get_cell(chunk_map, result_cell[1], result_cell[2])
 			if pos_ptr[0] ~= nil then
-				local pixel = world_ffi.remove_cell(grid_world, pos_ptr[0], result_cell[1], result_cell[2], false)
-				pos_ptr[0] = pixel
+				local mat_id = CellFactory_GetName(world_ffi.get_material_id(pos_ptr[0].vtable.get_material(pos_ptr[0])))
+				if mat_id == "conway_life_mat" then
+					local pixel = world_ffi.remove_cell(grid_world, pos_ptr[0], result_cell[1], result_cell[2], true)
+					pos_ptr[0] = pixel
+				end
 			end
 		end
 	end
@@ -155,6 +162,10 @@ end
 
 
 function OnPlayerSpawned(pid)
-	local x, y = EntityGetTransform(pid)
-	EntityLoad( "mods/conway_mod/files/conway_wand.xml", x + 15, y + 10 )
+	local spawn_check = tonumber(GlobalsGetValue( "EXTOL_CONWAY_INIT", "0" ))
+	if spawn_check == 0 then
+		local x, y = EntityGetTransform(pid)
+		EntityLoad( "mods/conway_mod/files/conway_wand.xml", x + 15, y + 10 )
+		GlobalsSetValue( "EXTOL_CONWAY_INIT", "1" )
+	end
 end
