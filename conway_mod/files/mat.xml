@@ -1,0 +1,28 @@
+<Materials>
+
+	<CellData
+		name="conway_life_mat"
+		ui_name="$mat_acid_gas"
+		density="100"
+		cell_type="gas"
+		wang_color="af4eb623"
+		liquid_gravity="0"
+		liquid_sand="0"
+		liquid_static="1"
+		platform_type="0"
+		show_in_creative_mode="1"	
+		burnable="0"
+		generates_smoke="0"
+		on_fire="0"
+		requires_oxygen="0"
+		hp="8000" 
+		audio_physics_material_event="sand"
+		audio_physics_material_wall="sand"
+		audio_physics_material_solid="sand"
+		durability="15">
+	<Graphics
+		color="ffffffff">
+    </Graphics>
+  </CellData>
+
+</Materials>

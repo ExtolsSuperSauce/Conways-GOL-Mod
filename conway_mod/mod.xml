@@ -1,0 +1,6 @@
+<Mod
+	name="Extol's Game of Life"
+	description="Based on Conway's Game of Life"
+	request_no_api_restrictions="1"	
+>
+</Mod>
