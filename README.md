@@ -12,6 +12,6 @@ Right-Click: Remove pixels
 
 Kicking: Starts/Stops simulations
 
-Possible features to come: GUI, bug fixes, uhhh lmk if you think of anything else.
+Possible features to come: GUI
 
 Have fun!
