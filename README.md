@@ -6,7 +6,6 @@ This mod is a Work-In-Progress!
 Possible features to come: GUI, bug fixes, uhhh lmk if you think of anything else.
 
 Known Issues: 
-being able to dig with the Conway Stone,
 being able to dig with the Pixels of Life,
 placing pixels of life under b2d objects,
 laggy with a metric fuckton of Pixels of Life.
