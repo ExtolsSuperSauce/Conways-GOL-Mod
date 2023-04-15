@@ -4,6 +4,8 @@ dofile_once("mods/conway_mod/nsew/load.lua")("mods/conway_mod")
 local ffi = require 'ffi'
 local world_ffi = require("nsew.world_ffi")
 
+-- https://conwaylife.com/wiki/Category:Patterns
+
 local life_templates = {
 	["Glider Gun"] = [[
                         O
@@ -14,8 +16,114 @@ OO        O     O   OO
 OO        O   O OO    O O
           O     O       O
            O   O
-            OO
-]]
+            OO]],
+	["L-weight Spaceship"] = [[
+ O  O
+O
+O   O
+OOOO]],
+	["M-weight Spaceship"] = [[
+   O
+ O   O
+O
+O    O
+OOOOO]],
+	["H-weight Spaceship"] = [[
+   OO
+ O    O
+O
+O     O
+OOOOOO]],
+	["Loafer"] = [[
+ OO  O OO
+O  O  OO 
+ O O     
+  O      
+        O
+      OOO
+     O   
+      O  
+       OO
+]],
+	["Space Rake"] = [[
+           OO     OOOO
+         OO OO   O   O
+         OOOO        O
+          OO     O  O
+
+        O
+       OO        OO
+      O         O  O
+       OOOOO    O  O
+        OOOO   OO OO
+           O    OO
+
+
+
+                  OOOO
+O  O             O   O
+    O                O
+O   O            O  O
+ OOOO]],
+	["x66"] = [[
+  O
+OO
+O  OOO  O
+O    OOO
+ OOO  OO
+
+ OOO  OO
+O    OOO
+O  OOO  O
+OO
+  O]],
+	["Queen Bee Shuttle"] = [[
+         O
+       O O
+      O O           OO
+OO   O  O           OO
+OO    O O
+       O O
+         O]],
+	["Copperhead"] = [[
+ OO  OO
+   OO
+   OO
+O O  O O
+O      O
+
+O      O
+ OO  OO
+  OOOO
+
+   OO
+   OO]],
+	["Glider"] = [[
+ O
+  O
+OOO]],
+	["Snail"] = [[
+ O
+ O
+O
+ OOO                 OOO   OOO
+ OO O         O   O O      OOO
+  O           OO O       O    OOOO
+      O      O   O O   OO O     OO
+   O  O OOO   OO         O        OO O
+   OO O     O     O                 O
+         O OOOOOOO
+
+         O OOOOOOO
+   OO O     O     O                 O
+   O  O OOO   OO         O        OO O
+      O      O   O O   OO O     OO
+  O           OO O       O    OOOO
+ OO O         O   O O      OOO
+ OOO                 OOO   OOO
+O
+ O
+ O]]
 }
 
 local function nearby_mats( matx, maty, mat_name )
@@ -76,7 +184,6 @@ local function PlaceTemplate(template, start_x, start_y)
 				pos_ptr[0] = pixel
 				table_insert_3x3( x, y )
 			end
-			GamePrint("Placement")
 			x = x + 1
 		else
 			x = x + 1
@@ -155,8 +262,8 @@ function OnWorldPostUpdate()
 					end
 					GamePrint("Template: " .. tostring(slct_template))
 				end
-				button_offset_y = button_offset_y - 10
-				if button_offset_y < 70 then
+				button_offset_y = button_offset_y + 10
+				if button_offset_y > 270 then
 					button_offset_y = screen_y/2 - 170
 					button_offset_x = button_offset_x - 100
 				end
@@ -176,8 +283,9 @@ function OnWorldPostUpdate()
 					table_insert_3x3( x, y )
 					GamePrint("Placed")
 				end
-			else
+			elseif ComponentGetValue2( cc_id, "mButtonFrameLeftClick" ) == GameGetFrameNum() then
 				PlaceTemplate(life_templates[slct_template], x, y)
+				GamePrint("Placed")
 			end
 		elseif mr_down and cursor_check and not hovered then
 			local pos_ptr = world_ffi.get_cell(chunk_map, x, y)
