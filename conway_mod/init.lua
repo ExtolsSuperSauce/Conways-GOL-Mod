@@ -4,7 +4,39 @@ dofile_once("mods/conway_mod/nsew/load.lua")("mods/conway_mod")
 local ffi = require 'ffi'
 local world_ffi = require("nsew.world_ffi")
 
-function nearby_mats( matx, maty, mat_name )
+local life_templates = {
+	glider_gun = [[
+                        O
+                      O O
+            OO      OO            OO
+           O   O    OO            OO
+OO        O     O   OO
+OO        O   O OO    O O
+          O     O       O
+           O   O
+            OO
+]]
+}
+
+local function PlaceTemplate(template, start_x, start_y)
+	local x = start_x
+	local y = start_y
+
+	for idx=1, #template do
+		local chr = template:sub(idx, idx)
+		if chr == '\n' then
+			x = start_x
+			y = y + 1
+		elseif chr == 'O' then
+			SetLife(x, y)
+			x = x + 1
+		else
+			x = x + 1
+		end
+	end
+end
+
+local function nearby_mats( matx, maty, mat_name )
 	local search_result = 0
 	local search_count = 0
 	local offset_y = math.floor(maty) - 1
@@ -12,10 +44,12 @@ function nearby_mats( matx, maty, mat_name )
 	local chunk_map = grid_world.vtable.get_chunk_map(grid_world)
 	while search_count < 9 do
 		local offset_x = math.floor(matx) + ((search_count % 3) - 1)
-		local pcell = world_ffi.get_cell(chunk_map, offset_x, offset_y)
-		if pcell[0] ~= nil then
-			local mat_id = CellFactory_GetName(world_ffi.get_material_id(pcell[0].vtable.get_material(pcell[0])))
-			if mat_id == mat_name then search_result = search_result + 1 end
+		if not (offset_x == matx and offset_y == maty) then
+			local pcell = world_ffi.get_cell(chunk_map, offset_x, offset_y)
+			if pcell[0] ~= nil then
+				local mat_id = CellFactory_GetName(world_ffi.get_material_id(pcell[0].vtable.get_material(pcell[0])))
+				if mat_id == mat_name then search_result = search_result + 1 end
+			end
 		end
 		if search_count % 3 == 2 then offset_y = offset_y + 1 end
 		search_count = search_count + 1
@@ -23,14 +57,14 @@ function nearby_mats( matx, maty, mat_name )
 	return search_result
 end
 
-function table_insert_9x9( mid_x, mid_y )
-	local x_off_list = {-1, -1, -1, 0, 0, 1, 1, 1 }
-	local y_off_list = {-1, 0, 1, -1, 1, -1, 0, 1}
-	for i=1, 8, 1 do
-		local position_insert = { pos_x = mid_x + x_off_list[i], pos_y = mid_y + y_off_list[i]}
+local function table_insert_3x3( mid_x, mid_y )
+	local x_off_list = {-1, -1, -1, 0, 0, 0, 1, 1, 1 }
+	local y_off_list = {-1, 0, 1, -1, 0, 1, -1, 0, 1}
+	for i=1, 9, 1 do
 		local has_found = false
-		for i, spot in ipairs(table_of_positions) do
-			if spot.pos_x == position_insert.pos_x and spot.pos_y == position_insert.pos_y then
+		local position_insert = { pos_x = mid_x + x_off_list[i], pos_y = mid_y + y_off_list[i]}
+		for i, pos_ind in ipairs(table_of_positions) do
+			if pos_ind.pos_x == position_insert.pos_x and pos_ind.pos_y == position_insert.pos_y then
 				has_found = true
 				break
 			end
@@ -46,89 +80,73 @@ function OnWorldPostUpdate()
 	local player = EntityGetWithName("DEBUG_NAME:player")
 	local i2c_id = EntityGetFirstComponentIncludingDisabled( player, "Inventory2Component")
 	local item_id = ComponentGetValue2( i2c_id, "mActiveItem" )
-
-	--gui = gui or GuiCreate()   unsure if I want to yet. just gonna leave it here until I decide to
 	
 	table_of_positions = table_of_positions or {}
 	
 	local cc_id = EntityGetFirstComponentIncludingDisabled( player, "ControlsComponent" )
 	local ml_down = ComponentGetValue2( cc_id, "mButtonDownLeftClick" )
 	local mr_down = ComponentGetValue2( cc_id, "mButtonDownRightClick" )
-	local kick_frame = ComponentGetValue2( cc_id, "mButtonFrameKick" )
-	local should_simulate = tonumber(GlobalsGetValue( "Conway_Extol_Sim", "0" ))
-	if kick_frame == GameGetFrameNum() then
-		if should_simulate == 1 then
-			GlobalsSetValue( "Conway_Extol_Sim", "0" )
-			should_simulate = 0
-		else
-			GlobalsSetValue( "Conway_Extol_Sim", "1" )
-			should_simulate = 1
-		end
-	end
+	local should_simulate = GlobalsGetValue( "Conway_Extol_Sim", "false" ) == "true"
 	local grid_world = world_ffi.get_grid_world()
 	local chunk_map = grid_world.vtable.get_chunk_map(grid_world)
 	local x, y = DEBUG_GetMouseWorld()
 	x = math.floor(x)
 	y = math.floor(y)
-	if world_ffi.chunk_loaded(chunk_map,x,y) then
-		if EntityGetName(item_id) == "CONWAY_STONE" then
-			if ml_down and should_simulate == 0 then
-				local pos_ptr = world_ffi.get_cell(chunk_map, x, y)
-				if pos_ptr[0] == nil then
-					local mat_ptr = world_ffi.get_material_ptr(CellFactory_GetType("conway_life_mat"))
-					local pixel = world_ffi.construct_cell(grid_world, x, y, mat_ptr, pos_ptr[0])
+	if EntityGetName(item_id) == "CONWAY_STONE" then
+		if ComponentGetValue2(cc_id, "mButtonFrameKick") == GameGetFrameNum() then
+			should_simulate = not should_simulate
+			GlobalsSetValue("Conway_Extol_Sim", tostring(should_simulate))
+		end
+		
+		--only display the GUI while stone is held
+		--TODO: ghost sprite, GUI Images?
+		--gui = gui or GuiCreate() 
+		
+		
+		
+		local cursor_check = world_ffi.chunk_loaded(chunk_map,x,y)
+		if ml_down and not should_simulate and cursor_check then
+			local pos_ptr = world_ffi.get_cell(chunk_map, x, y)
+			if pos_ptr[0] == nil then -- check for template
+				local mat_ptr = world_ffi.get_material_ptr(CellFactory_GetType("conway_life_mat"))
+				local pixel = world_ffi.construct_cell(grid_world, x, y, mat_ptr, pos_ptr[0])
+				pos_ptr[0] = pixel
+				table_insert_3x3( x, y )
+				GamePrint("Placed")
+			end
+		elseif mr_down and cursor_check then
+			local pos_ptr = world_ffi.get_cell(chunk_map, x, y)
+			if pos_ptr[0] ~= nil then
+				local mat_id = CellFactory_GetName(world_ffi.get_material_id(pos_ptr[0].vtable.get_material(pos_ptr[0])))
+				if mat_id == "conway_life_mat" then
+					local pixel = world_ffi.remove_cell(grid_world, pos_ptr[0], x, y, true)
 					pos_ptr[0] = pixel
-					local place_pos = { pos_x = x, pos_y = y }
-					table.insert( table_of_positions, place_pos )
-					table_insert_9x9( x, y )
-					GamePrint("Placed")
-				end
-			elseif mr_down then
-				local pos_ptr = world_ffi.get_cell(chunk_map, x, y)
-				if pos_ptr[0] ~= nil then
-					local mat_id = CellFactory_GetName(world_ffi.get_material_id(pos_ptr[0].vtable.get_material(pos_ptr[0])))
-					if mat_id == "conway_life_mat" then
-						local pixel = world_ffi.remove_cell(grid_world, pos_ptr[0], x, y, true)
-						pos_ptr[0] = pixel
-						table_insert_9x9( x, y )
-					end
+					table_insert_3x3( x, y )
 				end
 			end
 		end
 	end
+
+	if not should_simulate or GameGetFrameNum() % 5 ~= 0 then
+		return
+	end
 	
-	if should_simulate == 0 or #table_of_positions == 0 then
+	if #table_of_positions < 1 then
 		GlobalsSetValue( "Conway_Extol_Sim", "0" )
 		return
 	end
-
-	local table_of_results = {}
-
-	for i=#table_of_positions,1,-1 do
-		local index = table_of_positions[i]
-		if world_ffi.chunk_loaded(chunk_map,index.pos_x,index.pos_y) then
-			if world_ffi.chunk_loaded(chunk_map,index.pos_x,index.pos_y) then
-				local pos_ptr = world_ffi.get_cell(chunk_map, index.pos_x, index.pos_y)
-				if pos_ptr[0] ~= nil then
-					local nearby_count = nearby_mats(index.pos_x, index.pos_y, "conway_life_mat")
-					local result = {index.pos_x, index.pos_y, nearby_count}
-					table.insert( table_of_results, result )
-				else
-					local nearby_count = nearby_mats(index.pos_x, index.pos_y, "conway_life_mat")
-					if nearby_count == 3 then
-						local result = {index.pos_x, index.pos_y, nearby_count}
-						table.insert( table_of_results, result )
-					else
-						table.remove( table_of_positions, i ) --remove empty spaces we've made for spreading, and can't spread to
-					end
-				end
-			end
-		end
-	end
+	
+    local table_of_results = {}
+    for i, position in ipairs(table_of_positions) do
+        local nearby_count = nearby_mats(position.pos_x, position.pos_y, "conway_life_mat")
+        local result = {position.pos_x, position.pos_y, nearby_count}
+        table.insert(table_of_results, result)
+    end
+	
+    table_of_positions = {}
 	
 	for i, result_cell in ipairs(table_of_results) do
-		--GamePrint(result_cell[1] .. ", " .. result_cell[2])
-		if result_cell[3] > 4 then
+		if result_cell[3] > 3 then
 			local pos_ptr = world_ffi.get_cell(chunk_map, result_cell[1], result_cell[2])
 			if pos_ptr[0] ~= nil then
 				local mat_id = CellFactory_GetName(world_ffi.get_material_id(pos_ptr[0].vtable.get_material(pos_ptr[0])))
@@ -137,16 +155,17 @@ function OnWorldPostUpdate()
 					pos_ptr[0] = pixel
 				end
 			end
-		elseif result_cell[3] >= 3 then
+			local new_insert = {pos_x = result_cell[1], pos_y = result_cell[2]}
+			table_insert_3x3( result_cell[1], result_cell[2] )
+		elseif result_cell[3] >= 2 then
 			local pos_ptr = world_ffi.get_cell(chunk_map, result_cell[1], result_cell[2])
-			if pos_ptr[0] == nil then
+			if pos_ptr[0] == nil and result_cell[3] == 3 then
 				local mat_ptr = world_ffi.get_material_ptr(CellFactory_GetType("conway_life_mat"))
 				local pixel = world_ffi.construct_cell(grid_world, result_cell[1], result_cell[2], mat_ptr, nil)
 				pos_ptr[0] = pixel
-				local new_insert = {pos_x = result_cell[1], pos_y = result_cell[2]}
-				--table.insert( table_of_positions, new_insert ) Note: Since this already exists it will update next frame.
-				table_insert_9x9( result_cell[1], result_cell[2] ) -- Get new spaces to spread to
 			end
+			local new_insert = {pos_x = result_cell[1], pos_y = result_cell[2]}
+			table_insert_3x3( result_cell[1], result_cell[2] )
 		else
 			local pos_ptr = world_ffi.get_cell(chunk_map, result_cell[1], result_cell[2])
 			if pos_ptr[0] ~= nil then
@@ -154,6 +173,8 @@ function OnWorldPostUpdate()
 				if mat_id == "conway_life_mat" then
 					local pixel = world_ffi.remove_cell(grid_world, pos_ptr[0], result_cell[1], result_cell[2], true)
 					pos_ptr[0] = pixel
+					local new_insert = {pos_x = result_cell[1], pos_y = result_cell[2]}
+					table_insert_3x3( result_cell[1], result_cell[2] )
 				end
 			end
 		end
