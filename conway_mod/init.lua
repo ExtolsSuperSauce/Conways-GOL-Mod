@@ -5,7 +5,7 @@ local ffi = require 'ffi'
 local world_ffi = require("nsew.world_ffi")
 
 local life_templates = {
-	glider_gun = [[
+	["Glider Gun"] = [[
                         O
                       O O
             OO      OO            OO
@@ -17,24 +17,6 @@ OO        O   O OO    O O
             OO
 ]]
 }
-
-local function PlaceTemplate(template, start_x, start_y)
-	local x = start_x
-	local y = start_y
-
-	for idx=1, #template do
-		local chr = template:sub(idx, idx)
-		if chr == '\n' then
-			x = start_x
-			y = y + 1
-		elseif chr == 'O' then
-			SetLife(x, y)
-			x = x + 1
-		else
-			x = x + 1
-		end
-	end
-end
 
 local function nearby_mats( matx, maty, mat_name )
 	local search_result = 0
@@ -75,13 +57,62 @@ local function table_insert_3x3( mid_x, mid_y )
 	end
 end
 
+local function PlaceTemplate(template, start_x, start_y)
+	local x = start_x
+	local y = start_y
+
+	for idx=1, #template do
+		local chr = template:sub(idx, idx)
+		if chr == '\n' then
+			x = start_x
+			y = y + 1
+		elseif chr == 'O' then
+			local grid_world = world_ffi.get_grid_world()
+			local chunk_map = grid_world.vtable.get_chunk_map(grid_world)
+			local pos_ptr = world_ffi.get_cell(chunk_map, x, y)
+			if pos_ptr[0] == nil then
+				local mat_ptr = world_ffi.get_material_ptr(CellFactory_GetType("conway_life_mat"))
+				local pixel = world_ffi.construct_cell(grid_world, x, y, mat_ptr, pos_ptr[0])
+				pos_ptr[0] = pixel
+				table_insert_3x3( x, y )
+			end
+			GamePrint("Placement")
+			x = x + 1
+		else
+			x = x + 1
+		end
+	end
+end
+
+-- GUI STUFF 
+-- MY RANDOM NUMBER. NOT YOURS
+local new_id
+gui = gui or GuiCreate()
+table_of_positions = table_of_positions or {}
+
+local function get_new_id()
+	new_id = new_id + 1
+	return new_id
+end 
+
+local function gui_image_button( guix, guiy, image, text )
+	GuiImageButton( gui, get_new_id(), guix, guiy, text, image )
+	local isclicked, rclicked, ishovered = GuiGetPreviousWidgetInfo( gui )
+	return isclicked, ishovered, rclicked
+end
+
+local function gui_button( guix, guiy, text )
+	GuiButton( gui, get_new_id(), guix, guiy, text )
+	local isclicked, rclicked, ishovered = GuiGetPreviousWidgetInfo( gui )
+	return isclicked, ishovered, rclicked
+end
+
+
 function OnWorldPostUpdate()
 	
 	local player = EntityGetWithName("DEBUG_NAME:player")
 	local i2c_id = EntityGetFirstComponentIncludingDisabled( player, "Inventory2Component")
 	local item_id = ComponentGetValue2( i2c_id, "mActiveItem" )
-	
-	table_of_positions = table_of_positions or {}
 	
 	local cc_id = EntityGetFirstComponentIncludingDisabled( player, "ControlsComponent" )
 	local ml_down = ComponentGetValue2( cc_id, "mButtonDownLeftClick" )
@@ -89,32 +120,66 @@ function OnWorldPostUpdate()
 	local should_simulate = GlobalsGetValue( "Conway_Extol_Sim", "false" ) == "true"
 	local grid_world = world_ffi.get_grid_world()
 	local chunk_map = grid_world.vtable.get_chunk_map(grid_world)
-	local x, y = DEBUG_GetMouseWorld()
-	x = math.floor(x)
-	y = math.floor(y)
 	if EntityGetName(item_id) == "CONWAY_STONE" then
+		local x, y = DEBUG_GetMouseWorld()
+		x = math.floor(x)
+		y = math.floor(y)
 		if ComponentGetValue2(cc_id, "mButtonFrameKick") == GameGetFrameNum() then
 			should_simulate = not should_simulate
 			GlobalsSetValue("Conway_Extol_Sim", tostring(should_simulate))
 		end
 		
 		--only display the GUI while stone is held
-		--TODO: ghost sprite, GUI Images?
-		--gui = gui or GuiCreate() 
+		--TODO: ghost sprite, GUI Images? 
+		--GameCreateSpriteForXFrames( file, x, y, centered, offset_x, offset_y, frame, false)
+		new_id = 577064850
+		local screen_x, screen_y = GuiGetScreenDimensions(gui)
+		open_gui = open_gui or false
+		local clicked, hovered = gui_image_button( 101, 45, "mods/conway_mod/files/not_waterstone_ui.png", "" )
+		if clicked then
+			open_gui = not open_gui
+		end
 		
+		slct_template = slct_template or nil
+		if open_gui then
+			GuiText( gui, screen_x/2 - 150, screen_y/2 - 180, "Templates" )
+			local button_offset_x = screen_x/2 - 145
+			local button_offset_y = screen_y/2 - 170
+			for i in pairs(life_templates) do
+				clicked, hovered = gui_button( button_offset_x, button_offset_y, i )
+				if clicked then
+					if slct_template == i then
+						slct_template = nil
+					else
+						slct_template = i
+					end
+					GamePrint("Template: " .. tostring(slct_template))
+				end
+				button_offset_y = button_offset_y - 10
+				if button_offset_y < 70 then
+					button_offset_y = screen_y/2 - 170
+					button_offset_x = button_offset_x - 100
+				end
+			end
+		end
+		GuiStartFrame(gui)
 		
 		
 		local cursor_check = world_ffi.chunk_loaded(chunk_map,x,y)
-		if ml_down and not should_simulate and cursor_check then
-			local pos_ptr = world_ffi.get_cell(chunk_map, x, y)
-			if pos_ptr[0] == nil then -- check for template
-				local mat_ptr = world_ffi.get_material_ptr(CellFactory_GetType("conway_life_mat"))
-				local pixel = world_ffi.construct_cell(grid_world, x, y, mat_ptr, pos_ptr[0])
-				pos_ptr[0] = pixel
-				table_insert_3x3( x, y )
-				GamePrint("Placed")
+		if ml_down and not should_simulate and cursor_check and not hovered then
+			if slct_template == nil then
+				local pos_ptr = world_ffi.get_cell(chunk_map, x, y)
+				if pos_ptr[0] == nil then -- check for template
+					local mat_ptr = world_ffi.get_material_ptr(CellFactory_GetType("conway_life_mat"))
+					local pixel = world_ffi.construct_cell(grid_world, x, y, mat_ptr, pos_ptr[0])
+					pos_ptr[0] = pixel
+					table_insert_3x3( x, y )
+					GamePrint("Placed")
+				end
+			else
+				PlaceTemplate(life_templates[slct_template], x, y)
 			end
-		elseif mr_down and cursor_check then
+		elseif mr_down and cursor_check and not hovered then
 			local pos_ptr = world_ffi.get_cell(chunk_map, x, y)
 			if pos_ptr[0] ~= nil then
 				local mat_id = CellFactory_GetName(world_ffi.get_material_id(pos_ptr[0].vtable.get_material(pos_ptr[0])))
@@ -125,6 +190,8 @@ function OnWorldPostUpdate()
 				end
 			end
 		end
+	else
+		open_gui = false
 	end
 
 	if not should_simulate or GameGetFrameNum() % 5 ~= 0 then
@@ -155,7 +222,6 @@ function OnWorldPostUpdate()
 					pos_ptr[0] = pixel
 				end
 			end
-			local new_insert = {pos_x = result_cell[1], pos_y = result_cell[2]}
 			table_insert_3x3( result_cell[1], result_cell[2] )
 		elseif result_cell[3] >= 2 then
 			local pos_ptr = world_ffi.get_cell(chunk_map, result_cell[1], result_cell[2])
@@ -164,7 +230,6 @@ function OnWorldPostUpdate()
 				local pixel = world_ffi.construct_cell(grid_world, result_cell[1], result_cell[2], mat_ptr, nil)
 				pos_ptr[0] = pixel
 			end
-			local new_insert = {pos_x = result_cell[1], pos_y = result_cell[2]}
 			table_insert_3x3( result_cell[1], result_cell[2] )
 		else
 			local pos_ptr = world_ffi.get_cell(chunk_map, result_cell[1], result_cell[2])
@@ -173,7 +238,6 @@ function OnWorldPostUpdate()
 				if mat_id == "conway_life_mat" then
 					local pixel = world_ffi.remove_cell(grid_world, pos_ptr[0], result_cell[1], result_cell[2], true)
 					pos_ptr[0] = pixel
-					local new_insert = {pos_x = result_cell[1], pos_y = result_cell[2]}
 					table_insert_3x3( result_cell[1], result_cell[2] )
 				end
 			end
